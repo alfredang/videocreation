@@ -1,0 +1,7 @@
+node_modules/
+.env
+out/
+public/scene_*.mp3
+public/plan.json
+.remotion/
+*.log
