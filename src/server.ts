@@ -443,6 +443,9 @@ const HTML = `<!DOCTYPE html>
       };
     });
   </script>
+  <footer style="text-align:center;padding:18px 0 10px;color:#888;font-size:0.85rem;letter-spacing:0.02em;">
+    Powered by <a href="https://www.tertiarycourses.com.sg/" target="_blank" rel="noopener noreferrer" style="color:#a78bfa;text-decoration:none;">Tertiary Infotech Academy Pte Ltd</a>
+  </footer>
 </body>
 </html>`;
 
