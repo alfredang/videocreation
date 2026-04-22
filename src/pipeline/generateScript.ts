@@ -1,7 +1,8 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { execFile } from "node:child_process";
 import { Script, ScriptSchema } from "../types";
 
-const DEFAULT_MODEL = "claude-sonnet-4-6";
+const CLAUDE_BIN =
+  process.env.CLAUDE_BIN ?? "claude";
 
 const SYSTEM_PROMPT = `You are a scriptwriter for short, punchy 10-30 second narrated videos.
 Return JSON only, matching this shape:
@@ -19,33 +20,30 @@ Rules:
 - Each narration is plain prose suitable for text-to-speech. No emojis, no markdown, no quotation marks around speech.
 - Keep facts accurate. If the topic is abstract, make it concrete with examples.`;
 
-export async function generateScript(topic: string): Promise<Script> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    throw new Error(
-      "ANTHROPIC_API_KEY not set. Copy .env.example to .env and add your key."
-    );
-  }
-  const model = process.env.ANTHROPIC_MODEL ?? DEFAULT_MODEL;
-  const client = new Anthropic({ apiKey });
-
-  const response = await client.messages.create({
-    model,
-    max_tokens: 1024,
-    system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: `Topic: ${topic}\n\nReturn JSON only, no prose before or after.`,
+function runClaude(prompt: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = execFile(
+      CLAUDE_BIN,
+      ["-p", "--output-format", "text"],
+      { maxBuffer: 1024 * 1024, timeout: 60_000 },
+      (err, stdout, stderr) => {
+        if (err) {
+          reject(new Error(`claude CLI failed: ${err.message}\n${stderr}`));
+          return;
+        }
+        resolve(stdout.trim());
       },
-    ],
+    );
+    child.stdin?.write(prompt);
+    child.stdin?.end();
   });
+}
 
-  const textBlock = response.content.find((b) => b.type === "text");
-  if (!textBlock || textBlock.type !== "text") {
-    throw new Error("Claude returned no text content");
-  }
-  const raw = textBlock.text.trim();
+export async function generateScript(topic: string): Promise<Script> {
+  const prompt = `${SYSTEM_PROMPT}\n\nTopic: ${topic}\n\nReturn JSON only, no prose before or after.`;
+
+  console.log("[script] calling claude CLI...");
+  const raw = await runClaude(prompt);
 
   const jsonMatch = raw.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
@@ -57,14 +55,14 @@ export async function generateScript(topic: string): Promise<Script> {
     parsed = JSON.parse(jsonMatch[0]);
   } catch (err) {
     throw new Error(
-      `Claude returned invalid JSON: ${(err as Error).message}\n${raw}`
+      `Claude returned invalid JSON: ${(err as Error).message}\n${raw}`,
     );
   }
 
   const result = ScriptSchema.safeParse(parsed);
   if (!result.success) {
     throw new Error(
-      `Script failed validation: ${result.error.message}\nGot: ${JSON.stringify(parsed, null, 2)}`
+      `Script failed validation: ${result.error.message}\nGot: ${JSON.stringify(parsed, null, 2)}`,
     );
   }
   return result.data;
