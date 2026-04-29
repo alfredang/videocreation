@@ -493,8 +493,11 @@ async function buildVideoFilename(): Promise<string> {
   try {
     const planRaw = await fs.readFile(path.resolve("public", "plan.json"), "utf8");
     const plan = JSON.parse(planRaw);
-    if (typeof plan?.title === "string" && plan.title.trim()) {
-      return `${sanitizeFilename(plan.title)}.mp4`;
+    const source =
+      (typeof plan?.topic === "string" && plan.topic.trim()) ||
+      (typeof plan?.title === "string" && plan.title.trim());
+    if (source) {
+      return `${sanitizeFilename(source)}.mp4`;
     }
   } catch {
     // fall through
