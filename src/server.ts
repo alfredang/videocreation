@@ -480,6 +480,28 @@ function send(res: http.ServerResponse, type: string, message: string) {
   res.write(`data: ${JSON.stringify({ type, message })}\n\n`);
 }
 
+function sanitizeFilename(title: string): string {
+  const cleaned = title
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80);
+  return cleaned || "video";
+}
+
+async function buildVideoFilename(): Promise<string> {
+  try {
+    const planRaw = await fs.readFile(path.resolve("public", "plan.json"), "utf8");
+    const plan = JSON.parse(planRaw);
+    if (typeof plan?.title === "string" && plan.title.trim()) {
+      return `${sanitizeFilename(plan.title)}.mp4`;
+    }
+  } catch {
+    // fall through
+  }
+  return "video.mp4";
+}
+
 async function handleGenerate(
   topic: string,
   format: string,
@@ -600,9 +622,12 @@ const server = http.createServer(async (req, res) => {
     const videoPath = path.resolve("out", "video.mp4");
     try {
       const data = await fs.readFile(videoPath);
+      const filename = await buildVideoFilename();
+      const asciiName = filename.replace(/[^\x20-\x7e]/g, "_");
+      const encodedName = encodeURIComponent(filename);
       res.writeHead(200, {
         "Content-Type": "video/mp4",
-        "Content-Disposition": 'attachment; filename="video.mp4"',
+        "Content-Disposition": `attachment; filename="${asciiName}"; filename*=UTF-8''${encodedName}`,
         "Content-Length": data.length,
       });
       res.end(data);
