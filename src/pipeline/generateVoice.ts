@@ -15,12 +15,13 @@ export type VoiceResult = {
 
 function runEdgeTts(args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn("edge-tts", args, { stdio: "inherit", shell: true });
+    const cmd = process.env.EDGE_TTS_CMD ?? "python -m edge_tts";
+    const child = spawn(cmd, args, { stdio: "inherit", shell: true });
     child.on("error", (err) => {
       if ((err as NodeJS.ErrnoException).code === "ENOENT") {
         reject(
           new Error(
-            "edge-tts not found on PATH. Install with: pip install edge-tts"
+            "edge-tts not found. Install with: pip install edge-tts"
           )
         );
       } else {

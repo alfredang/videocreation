@@ -113,7 +113,27 @@ const HTML = `<!DOCTYPE html>
       border-color: #818cf8;
       box-shadow: 0 0 0 3px rgba(129,140,248,0.15);
     }
-    input[type="text"]::placeholder { color: #52525b; }
+    input[type="text"]::placeholder, textarea::placeholder { color: #52525b; }
+
+    textarea {
+      width: 100%;
+      padding: 12px 16px;
+      font-size: 15px;
+      border: 1px solid #27272a;
+      border-radius: 10px;
+      background: #18181b;
+      color: #fff;
+      outline: none;
+      resize: vertical;
+      min-height: 90px;
+      font-family: inherit;
+      line-height: 1.5;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    textarea:focus {
+      border-color: #818cf8;
+      box-shadow: 0 0 0 3px rgba(129,140,248,0.15);
+    }
 
     /* ── Format picker ── */
     .format-group {
@@ -319,6 +339,11 @@ const HTML = `<!DOCTYPE html>
         </div>
 
         <div class="field">
+          <label for="description">Description <span style="text-transform:none;color:#52525b;font-weight:400;">(optional)</span></label>
+          <textarea id="description" name="description" placeholder="Add details, angle, audience, key points to cover..."></textarea>
+        </div>
+
+        <div class="field">
           <label>Format</label>
           <div class="format-group">
             <label class="format-option">
@@ -384,6 +409,7 @@ const HTML = `<!DOCTYPE html>
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       const topic = document.getElementById('topic').value.trim();
+      const description = document.getElementById('description').value.trim();
       const format = document.querySelector('input[name="format"]:checked').value;
       if (!topic) return;
 
@@ -395,6 +421,7 @@ const HTML = `<!DOCTYPE html>
       videoResult.classList.remove('visible');
 
       const params = new URLSearchParams({ topic, format });
+      if (description) params.set('description', description);
       const evtSource = new EventSource('/generate?' + params.toString());
 
       evtSource.onmessage = (event) => {
@@ -457,6 +484,7 @@ async function handleGenerate(
   topic: string,
   format: string,
   res: http.ServerResponse,
+  description?: string,
 ) {
   if (busy) {
     send(res, "error", "A video is already being generated. Please wait.");
@@ -470,7 +498,10 @@ async function handleGenerate(
   try {
     send(res, "log", `[format] ${label} (${width}x${height})`);
     send(res, "log", `[script] Generating script for: "${topic}"`);
-    const script = await generateScript(topic);
+    if (description) {
+      send(res, "log", `[script] Using description (${description.length} chars)`);
+    }
+    const script = await generateScript(topic, description);
     send(
       res,
       "log",
@@ -548,6 +579,7 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === "/generate" && req.method === "GET") {
     const topic = url.searchParams.get("topic")?.trim();
     const format = url.searchParams.get("format") ?? "tiktok";
+    const description = url.searchParams.get("description")?.trim() || undefined;
     if (!topic) {
       res.writeHead(400, { "Content-Type": "text/plain" });
       res.end("Missing topic parameter");
@@ -560,7 +592,7 @@ const server = http.createServer(async (req, res) => {
       Connection: "keep-alive",
     });
 
-    await handleGenerate(topic, format, res);
+    await handleGenerate(topic, format, res, description);
     return;
   }
 
