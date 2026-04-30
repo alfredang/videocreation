@@ -15,7 +15,7 @@ export type VoiceResult = {
 
 function runEdgeTts(args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    const cmd = process.env.EDGE_TTS_CMD ?? "python -m edge_tts";
+    const cmd = process.env.EDGE_TTS_CMD ?? "edge-tts";
     const child = spawn(cmd, args, { stdio: "inherit", shell: true });
     child.on("error", (err) => {
       if ((err as NodeJS.ErrnoException).code === "ENOENT") {
